@@ -1,0 +1,28 @@
+name: Validate infrastructure
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'infra/**'
+      - '.github/workflows/validate-infra.yml'
+  pull_request:
+    paths:
+      - 'infra/**'
+      - '.github/workflows/validate-infra.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  bicep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build main template
+        run: az bicep build --file infra/main.bicep
+      - name: Build parameter profiles
+        run: |
+          az bicep build-params --file infra/profiles/static.bicepparam
+          az bicep build-params --file infra/profiles/serverless.bicepparam
+          az bicep build-params --file infra/profiles/advanced.bicepparam
