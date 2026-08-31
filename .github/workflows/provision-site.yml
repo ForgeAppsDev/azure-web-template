@@ -1,0 +1,120 @@
+name: Provision site
+
+on:
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: 'Client repository name, for example client-wisniowy-piec'
+        required: true
+        type: string
+      projectName:
+        description: 'Lowercase Azure project slug, for example wisniowy-piec'
+        required: true
+        type: string
+      profile:
+        description: 'Infrastructure profile'
+        required: true
+        type: choice
+        options:
+          - static
+          - serverless
+          - advanced
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: prod
+        type: choice
+        options:
+          - dev
+          - test
+          - staging
+          - prod
+      location:
+        description: 'Azure region supporting selected services'
+        required: true
+        default: westeurope
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  provision:
+    if: github.repository == 'MPiwowarski/azure-web-template'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout central repository
+        uses: actions/checkout@v4
+
+      - name: Validate inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "${{ inputs.repository }}" =~ ^[A-Za-z0-9_.-]+$ ]]
+          [[ "${{ inputs.projectName }}" =~ ^[a-z0-9][a-z0-9-]{1,39}$ ]]
+          [[ "${{ inputs.location }}" =~ ^[a-z0-9]+$ ]]
+
+      - name: Azure login with central provisioner OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_PROVISIONER_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Create isolated client deployment boundary
+        id: provision
+        shell: bash
+        run: |
+          set -euo pipefail
+          outputs=$(az deployment sub create \
+            --name "provision-${{ inputs.projectName }}-${{ inputs.environment }}" \
+            --location "${{ inputs.location }}" \
+            --template-file provision/provision-site.bicep \
+            --parameters \
+              repository="${{ inputs.repository }}" \
+              projectName="${{ inputs.projectName }}" \
+              profile="${{ inputs.profile }}" \
+              environmentName="${{ inputs.environment }}" \
+              location="${{ inputs.location }}" \
+            --query properties.outputs \
+            --output json)
+
+          for pair in \
+            "AZURE_CLIENT_ID:azureClientId" \
+            "AZURE_TENANT_ID:azureTenantId" \
+            "AZURE_SUBSCRIPTION_ID:azureSubscriptionId" \
+            "AZURE_RESOURCE_GROUP:azureResourceGroup" \
+            "AZURE_LOCATION:azureLocation" \
+            "PROJECT_NAME:projectNameValue" \
+            "SITE_PROFILE:siteProfile" \
+            "ENVIRONMENT_NAME:environmentNameValue"; do
+            variable_name=${pair%%:*}
+            output_name=${pair##*:}
+            value=$(jq -r --arg key "$output_name" '.[$key].value' <<< "$outputs")
+            echo "${variable_name}=${value}" >> "$GITHUB_OUTPUT"
+          done
+
+      - name: Write GitHub Variables handoff
+        shell: bash
+        env:
+          TARGET_REPOSITORY: MPiwowarski/${{ inputs.repository }}
+        run: |
+          {
+            echo "### Azure provisioning complete"
+            echo "The client Resource Group, deployment identity, OIDC credential and RG-scoped RBAC are ready."
+            echo
+            echo "The central repository token cannot modify another repository's Actions variables."
+            echo "Run these commands once with GitHub CLI authenticated as the repository owner:"
+            echo '```bash'
+            printf 'gh variable set AZURE_CLIENT_ID --repo %q --body %q\n' "$TARGET_REPOSITORY" "${{ steps.provision.outputs.AZURE_CLIENT_ID }}"
+            printf 'gh variable set AZURE_TENANT_ID --repo %q --body %q\n' "$TARGET_REPOSITORY" "${{ steps.provision.outputs.AZURE_TENANT_ID }}"
+            printf 'gh variable set AZURE_SUBSCRIPTION_ID --repo %q --body %q\n' "$TARGET_REPOSITORY" "${{ steps.provision.outputs.AZURE_SUBSCRIPTION_ID }}"
+            printf 'gh variable set AZURE_RESOURCE_GROUP --repo %q --body %q\n' "$TARGET_REPOSITORY" "${{ steps.provision.outputs.AZURE_RESOURCE_GROUP }}"
+            printf 'gh variable set AZURE_LOCATION --repo %q --body %q\n' "$TARGET_REPOSITORY" "${{ steps.provision.outputs.AZURE_LOCATION }}"
+            printf 'gh variable set PROJECT_NAME --repo %q --body %q\n' "$TARGET_REPOSITORY" "${{ steps.provision.outputs.PROJECT_NAME }}"
+            printf 'gh variable set SITE_PROFILE --repo %q --body %q\n' "$TARGET_REPOSITORY" "${{ steps.provision.outputs.SITE_PROFILE }}"
+            printf 'gh variable set ENVIRONMENT_NAME --repo %q --body %q\n' "$TARGET_REPOSITORY" "${{ steps.provision.outputs.ENVIRONMENT_NAME }}"
+            echo '```'
+            echo "After setting the variables, run the client repo's **Deploy site** workflow or push to \`main\`."
+          } >> "$GITHUB_STEP_SUMMARY"

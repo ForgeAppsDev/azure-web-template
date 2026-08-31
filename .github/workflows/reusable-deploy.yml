@@ -1,0 +1,171 @@
+name: Reusable Azure deployment
+
+on:
+  workflow_call:
+    inputs:
+      project_name:
+        required: true
+        type: string
+      profile:
+        required: true
+        type: string
+      environment_name:
+        required: true
+        type: string
+      location:
+        required: true
+        type: string
+      resource_group:
+        required: true
+        type: string
+      azure_client_id:
+        required: true
+        type: string
+      azure_tenant_id:
+        required: true
+        type: string
+      azure_subscription_id:
+        required: true
+        type: string
+      frontend_path:
+        required: false
+        default: '.'
+        type: string
+      frontend_output_path:
+        required: false
+        default: 'dist'
+        type: string
+      functions_path:
+        required: false
+        default: 'api'
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: azure-${{ inputs.resource_group }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout client repository
+        uses: actions/checkout@v4
+
+      - name: Validate deployment inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "${{ inputs.profile }}" =~ ^(static|serverless|advanced)$ ]]
+          [[ "${{ inputs.environment_name }}" =~ ^(dev|test|staging|prod)$ ]]
+          [[ "${{ inputs.project_name }}" =~ ^[a-z0-9][a-z0-9-]{1,39}$ ]]
+
+      - name: Azure login with GitHub OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ inputs.azure_client_id }}
+          tenant-id: ${{ inputs.azure_tenant_id }}
+          subscription-id: ${{ inputs.azure_subscription_id }}
+
+      - name: Deploy or update Azure infrastructure
+        id: infrastructure
+        shell: bash
+        run: |
+          set -euo pipefail
+          outputs=$(az deployment group create \
+            --name "site-${{ github.run_id }}-${{ github.run_attempt }}" \
+            --resource-group "${{ inputs.resource_group }}" \
+            --template-file infra/main.bicep \
+            --parameters \
+              projectName="${{ inputs.project_name }}" \
+              environmentName="${{ inputs.environment_name }}" \
+              profile="${{ inputs.profile }}" \
+              location="${{ inputs.location }}" \
+              staticWebAppLocation="${{ inputs.location }}" \
+            --query properties.outputs \
+            --output json)
+          echo "static_web_app=$(jq -r '.staticWebAppName.value' <<< "$outputs")" >> "$GITHUB_OUTPUT"
+          echo "function_app=$(jq -r '.functionAppName.value' <<< "$outputs")" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare frontend
+        id: frontend
+        shell: bash
+        working-directory: ${{ inputs.frontend_path }}
+        run: |
+          set -euo pipefail
+          deploy_path=""
+          if [[ -f package.json ]]; then
+            npm ci
+            npm run build
+            deploy_path="${{ inputs.frontend_path }}/${{ inputs.frontend_output_path }}"
+          elif [[ -f index.html ]]; then
+            deploy_path="${{ inputs.frontend_path }}"
+          fi
+          echo "deploy_path=$deploy_path" >> "$GITHUB_OUTPUT"
+
+      - name: Get ephemeral Static Web Apps deployment token
+        if: steps.frontend.outputs.deploy_path != ''
+        id: swa_token
+        shell: bash
+        run: |
+          set -euo pipefail
+          az config set extension.use_dynamic_install=yes_without_prompt
+          token=$(az staticwebapp secrets list \
+            --name "${{ steps.infrastructure.outputs.static_web_app }}" \
+            --resource-group "${{ inputs.resource_group }}" \
+            --query properties.apiKey \
+            --output tsv)
+          echo "::add-mask::$token"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy frontend to Azure Static Web Apps
+        if: steps.frontend.outputs.deploy_path != ''
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ steps.swa_token.outputs.token }}
+          action: upload
+          app_location: ${{ steps.frontend.outputs.deploy_path }}
+          output_location: ''
+          skip_app_build: true
+
+      - name: Detect Functions project
+        if: inputs.profile != 'static'
+        id: functions
+        shell: bash
+        run: |
+          set -euo pipefail
+          project=$(find "${{ inputs.functions_path }}" -maxdepth 2 -name '*.csproj' -print -quit 2>/dev/null || true)
+          echo "project=$project" >> "$GITHUB_OUTPUT"
+
+      - name: Set up .NET 8
+        if: inputs.profile != 'static' && steps.functions.outputs.project != ''
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Publish Functions backend
+        if: inputs.profile != 'static' && steps.functions.outputs.project != ''
+        shell: bash
+        run: dotnet publish "${{ steps.functions.outputs.project }}" -c Release -o .deploy/functions
+
+      - name: Deploy Functions backend
+        if: inputs.profile != 'static' && steps.functions.outputs.project != ''
+        uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ steps.infrastructure.outputs.function_app }}
+          package: .deploy/functions
+          sku: flexconsumption
+
+      - name: Deployment summary
+        shell: bash
+        run: |
+          {
+            echo "### Azure deployment complete"
+            echo "- Resource group: \`${{ inputs.resource_group }}\`"
+            echo "- Profile: \`${{ inputs.profile }}\`"
+            echo "- Static Web App: \`${{ steps.infrastructure.outputs.static_web_app }}\`"
+            echo "- Function App: \`${{ steps.infrastructure.outputs.function_app || 'not deployed' }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+

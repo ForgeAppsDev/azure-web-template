@@ -1,0 +1,25 @@
+name: Deploy site
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    if: github.repository != 'MPiwowarski/azure-web-template'
+    uses: MPiwowarski/azure-web-template/.github/workflows/reusable-deploy.yml@main
+    with:
+      project_name: ${{ vars.PROJECT_NAME }}
+      profile: ${{ vars.SITE_PROFILE }}
+      environment_name: ${{ vars.ENVIRONMENT_NAME }}
+      location: ${{ vars.AZURE_LOCATION }}
+      resource_group: ${{ vars.AZURE_RESOURCE_GROUP }}
+      azure_client_id: ${{ vars.AZURE_CLIENT_ID }}
+      azure_tenant_id: ${{ vars.AZURE_TENANT_ID }}
+      azure_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
