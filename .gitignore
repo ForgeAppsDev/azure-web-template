@@ -1,0 +1,19 @@
+# Azure CLI / deployment outputs
+*.jsonc
+.azure/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Build artifacts
+bin/
+obj/
+node_modules/
+dist/
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
