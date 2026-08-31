@@ -5,11 +5,15 @@ on:
     branches: [main]
     paths:
       - 'infra/**'
-      - '.github/workflows/validate-infra.yml'
+      - 'bootstrap/**'
+      - 'provision/**'
+      - '.github/workflows/**'
   pull_request:
     paths:
       - 'infra/**'
-      - '.github/workflows/validate-infra.yml'
+      - 'bootstrap/**'
+      - 'provision/**'
+      - '.github/workflows/**'
 
 permissions:
   contents: read
@@ -26,3 +30,9 @@ jobs:
           az bicep build-params --file infra/profiles/static.bicepparam
           az bicep build-params --file infra/profiles/serverless.bicepparam
           az bicep build-params --file infra/profiles/advanced.bicepparam
+      - name: Build control-plane templates
+        run: |
+          az bicep build --file bootstrap/bootstrap.bicep
+          az bicep build --file provision/provision-site.bicep
+      - name: Validate GitHub Actions syntax
+        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12
