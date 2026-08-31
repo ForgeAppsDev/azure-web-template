@@ -45,7 +45,7 @@ var deployBackend = contains([
 var deployDataStorage = profile == 'advanced'
 var normalizedProject = toLower(replace(projectName, '-', ''))
 var suffix = uniqueString(subscription().subscriptionId, resourceGroup().id, projectName, environmentName)
-var namePrefix = concat(projectName, '-', environmentName)
+var namePrefix = '${projectName}-${environmentName}'
 var commonTags = union(tags, {
   project: projectName
   environment: environmentName
@@ -56,7 +56,7 @@ var commonTags = union(tags, {
 module staticWebApp 'modules/static-web-app.bicep' = {
   name: 'static-web-app'
   params: {
-    name: concat(namePrefix, '-web')
+    name: '${namePrefix}-web'
     location: staticWebAppLocation
     sku: staticWebAppSku
     tags: commonTags
@@ -75,10 +75,11 @@ module monitoring 'modules/monitoring.bicep' = if (deployBackend) {
 module functionStorage 'modules/storage.bicep' = if (deployBackend) {
   name: 'function-storage'
   params: {
-    name: take(concat('st', normalizedProject, environmentName, suffix), 24)
+    name: take('st${normalizedProject}${environmentName}${suffix}', 24)
     location: location
     tags: commonTags
     allowBlobPublicAccess: false
+    deploymentContainerName: 'function-releases'
   }
 }
 
@@ -87,9 +88,11 @@ module functions 'modules/functions.bicep' = if (deployBackend) {
   params: {
     namePrefix: namePrefix
     location: location
-    storageAccountName: functionStorage.outputs.name
-    storageAccountId: functionStorage.outputs.id
-    applicationInsightsConnectionString: monitoring.outputs.applicationInsightsConnectionString
+    storageAccountName: functionStorage!.outputs.name
+    storageAccountId: functionStorage!.outputs.id
+    deploymentContainerName: functionStorage!.outputs.deploymentContainerName
+    deploymentContainerUrl: functionStorage!.outputs.deploymentContainerUrl
+    applicationInsightsConnectionString: monitoring!.outputs.applicationInsightsConnectionString
     tags: commonTags
   }
 }
@@ -97,7 +100,7 @@ module functions 'modules/functions.bicep' = if (deployBackend) {
 module dataStorage 'modules/storage.bicep' = if (deployDataStorage) {
   name: 'data-storage'
   params: {
-    name: take(concat('data', normalizedProject, environmentName, suffix), 24)
+    name: take('data${normalizedProject}${environmentName}${suffix}', 24)
     location: location
     tags: union(commonTags, {
       purpose: 'application-data'
@@ -109,6 +112,6 @@ module dataStorage 'modules/storage.bicep' = if (deployDataStorage) {
 output profile string = profile
 output staticWebAppName string = staticWebApp.outputs.name
 output staticWebAppHostname string = staticWebApp.outputs.defaultHostname
-output functionAppName string = deployBackend ? functions.outputs.name : ''
-output functionAppHostname string = deployBackend ? functions.outputs.defaultHostname : ''
-output dataStorageAccountName string = deployDataStorage ? dataStorage.outputs.name : ''
+output functionAppName string = deployBackend ? functions!.outputs.name : ''
+output functionAppHostname string = deployBackend ? functions!.outputs.defaultHostname : ''
+output dataStorageAccountName string = deployDataStorage ? dataStorage!.outputs.name : ''
