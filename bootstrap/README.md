@@ -29,3 +29,5 @@ Groups, ARM deployments, managed identities and federated credentials. It also
 receives Role Based Access Control Administrator with a condition that permits
 assigning only the client `Contributor` and conditioned `RBAC Administrator`
 roles. It is intentionally never shared with client repos.
+
+For repositories using GitHub immutable-ID OIDC subjects, pass the exact emitted subject as `--parameters githubSubject="repo:OWNER@OWNER_ID/REPO@REPO_ID:ref:refs/heads/main"`. The provisioner resolves IDs for client repositories automatically.

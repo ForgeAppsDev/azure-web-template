@@ -64,15 +64,23 @@ jobs:
 
       - name: Create isolated client deployment boundary
         id: provision
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_OWNER: ${{ github.repository_owner }}
+          GH_OWNER_ID: ${{ github.repository_owner_id }}
+          CLIENT_REPOSITORY: ${{ inputs.repository }}
         shell: bash
         run: |
           set -euo pipefail
+          repository_id=$(gh api "repos/$GH_OWNER/$CLIENT_REPOSITORY" --jq .id)
+          subject="repo:${GH_OWNER}@${GH_OWNER_ID}/${CLIENT_REPOSITORY}@${repository_id}:ref:refs/heads/main"
           outputs=$(az deployment sub create \
             --name "provision-${{ inputs.projectName }}-${{ inputs.environment }}" \
             --location "${{ inputs.location }}" \
             --template-file provision/provision-site.bicep \
             --parameters \
               repository="${{ inputs.repository }}" \
+              githubSubject="$subject" \
               projectName="${{ inputs.projectName }}" \
               profile="${{ inputs.profile }}" \
               environmentName="${{ inputs.environment }}" \

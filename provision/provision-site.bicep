@@ -1,6 +1,9 @@
 targetScope = 'subscription'
 
 param githubOwner string = 'ForgeAppsDev'
+
+@description('Exact GitHub OIDC subject, including immutable IDs when enabled by GitHub.')
+param githubSubject string = ''
 param repository string
 
 @minLength(2)
@@ -44,6 +47,7 @@ module clientBoundary 'client-boundary.bicep' = {
   scope: clientResourceGroup
   params: {
     githubOwner: githubOwner
+    githubSubject: githubSubject
     repository: repository
     projectName: projectName
     environmentName: environmentName

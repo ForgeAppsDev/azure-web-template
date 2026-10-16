@@ -1,5 +1,6 @@
 targetScope = 'resourceGroup'
 
+param githubSubject string = ''
 param githubOwner string
 param repository string
 param projectName string
@@ -27,7 +28,7 @@ resource mainBranchCredential 'Microsoft.ManagedIdentity/userAssignedIdentities/
   name: 'github-main'
   properties: {
     issuer: 'https://token.actions.githubusercontent.com'
-    subject: 'repo:${githubOwner}/${repository}:ref:refs/heads/main'
+    subject: empty(githubSubject) ? 'repo:${githubOwner}/${repository}:ref:refs/heads/main' : githubSubject
     audiences: [
       'api://AzureADTokenExchange'
     ]

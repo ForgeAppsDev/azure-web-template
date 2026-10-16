@@ -2,6 +2,9 @@ targetScope = 'subscription'
 
 param location string = 'westeurope'
 param githubOwner string = 'ForgeAppsDev'
+
+@description('Exact GitHub OIDC subject, including immutable IDs when enabled by GitHub.')
+param githubSubject string = ''
 param repository string = 'azure-web-template'
 param resourceGroupName string = 'rg-azure-web-platform'
 param identityName string = 'id-github-azure-web-provisioner'
@@ -57,6 +60,7 @@ module platformIdentity 'platform-identity.bicep' = {
   params: {
     location: location
     githubOwner: githubOwner
+    githubSubject: githubSubject
     repository: repository
     identityName: identityName
   }
