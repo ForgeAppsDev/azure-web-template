@@ -1,0 +1,27 @@
+name: Validate platform OIDC
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  verify:
+    if: github.repository == 'ForgeAppsDev/azure-web-template'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sign in as central provisioner
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_PROVISIONER_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Verify subscription and platform access
+        shell: bash
+        run: |
+          set -euo pipefail
+          az account show --query '{name:name,state:state}' -o json
+          az group show --name rg-azure-web-platform --query '{name:name,location:location}' -o json
+          az identity show --resource-group rg-azure-web-platform --name id-github-azure-web-provisioner --query name -o tsv
