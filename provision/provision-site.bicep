@@ -1,6 +1,6 @@
 targetScope = 'subscription'
 
-param githubOwner string = 'MPiwowarski'
+param githubOwner string = 'ForgeAppsDev'
 param repository string
 
 @minLength(2)

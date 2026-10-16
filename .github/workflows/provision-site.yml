@@ -41,7 +41,7 @@ permissions:
 
 jobs:
   provision:
-    if: github.repository == 'MPiwowarski/azure-web-template'
+    if: github.repository == 'ForgeAppsDev/azure-web-template'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout central repository
@@ -98,7 +98,7 @@ jobs:
       - name: Write GitHub Variables handoff
         shell: bash
         env:
-          TARGET_REPOSITORY: MPiwowarski/${{ inputs.repository }}
+          TARGET_REPOSITORY: ForgeAppsDev/${{ inputs.repository }}
         run: |
           {
             echo "### Azure provisioning complete"

@@ -50,7 +50,7 @@ Storage, and a dedicated blob container for deployment packages. Linux Consumpti
 This connects only the central repository to the Azure subscription:
 
 ```text
-MPiwowarski/azure-web-template
+ForgeAppsDev/azure-web-template
   → GitHub OIDC
   → id-github-azure-web-provisioner
   → Azure subscription provisioning permissions
@@ -94,7 +94,7 @@ location:    westeurope
 On GitHub select **Use this template**, then create:
 
 ```text
-MPiwowarski/client-wisniowy-piec
+ForgeAppsDev/client-wisniowy-piec
 ```
 
 ### Step B — provision its isolated Azure boundary
@@ -108,7 +108,7 @@ The workflow creates:
 rg-wisniowy-piec-prod
 └─ id-github-wisniowy-piec-prod
    └─ federated subject:
-      repo:MPiwowarski/client-wisniowy-piec:ref:refs/heads/main
+      repo:ForgeAppsDev/client-wisniowy-piec:ref:refs/heads/main
 ```
 
 The identity receives `Contributor` and `Role Based Access Control Administrator`
@@ -144,7 +144,7 @@ Push site code to the client's `main` branch or run **Deploy site** manually.
 The thin `.github/workflows/deploy.yml` calls the central reusable workflow:
 
 ```yaml
-uses: MPiwowarski/azure-web-template/.github/workflows/reusable-deploy.yml@main
+uses: ForgeAppsDev/azure-web-template/.github/workflows/reusable-deploy.yml@main
 ```
 
 Infrastructure is created or updated idempotently, then the frontend and optional

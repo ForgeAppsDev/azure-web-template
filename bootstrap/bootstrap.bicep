@@ -1,7 +1,7 @@
 targetScope = 'subscription'
 
 param location string = 'westeurope'
-param githubOwner string = 'MPiwowarski'
+param githubOwner string = 'ForgeAppsDev'
 param repository string = 'azure-web-template'
 param resourceGroupName string = 'rg-azure-web-platform'
 param identityName string = 'id-github-azure-web-provisioner'

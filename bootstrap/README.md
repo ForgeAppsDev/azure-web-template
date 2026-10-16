@@ -1,7 +1,7 @@
 # One-time Azure platform bootstrap
 
 This deployment creates the central GitHub OIDC identity used only by
-`MPiwowarski/azure-web-template` to provision isolated client resource groups.
+`ForgeAppsDev/azure-web-template` to provision isolated client resource groups.
 
 Run once as an Azure subscription Owner (or an identity able to create resource
 groups, managed identities, federated credentials, and role assignments):

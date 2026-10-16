@@ -11,8 +11,8 @@ permissions:
 
 jobs:
   deploy:
-    if: github.repository != 'MPiwowarski/azure-web-template'
-    uses: MPiwowarski/azure-web-template/.github/workflows/reusable-deploy.yml@main
+    if: github.repository != 'ForgeAppsDev/azure-web-template'
+    uses: ForgeAppsDev/azure-web-template/.github/workflows/reusable-deploy.yml@main
     with:
       project_name: ${{ vars.PROJECT_NAME }}
       profile: ${{ vars.SITE_PROFILE }}
