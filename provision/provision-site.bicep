@@ -53,6 +53,7 @@ module clientBoundary 'client-boundary.bicep' = {
     environmentName: environmentName
     location: location
     tags: commonTags
+    enableRuntimeRoleAssignments: profile != 'static'
   }
 }
 

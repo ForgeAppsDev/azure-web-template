@@ -7,6 +7,7 @@ param projectName string
 param environmentName string
 param location string
 param tags object = {}
+param enableRuntimeRoleAssignments bool = true
 
 var identityName = 'id-github-${projectName}-${environmentName}'
 var contributorRoleId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b24988ac-6180-42a0-ab88-20f7382dd24c')
@@ -46,7 +47,7 @@ resource resourceGroupContributor 'Microsoft.Authorization/roleAssignments@2022-
 
 // The application Bicep grants its Functions runtime identity narrow Storage
 // data roles. This role never escapes the client's Resource Group.
-resource resourceGroupRbacAdmin 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+resource resourceGroupRbacAdmin 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (enableRuntimeRoleAssignments) {
   name: guid(resourceGroup().id, deploymentIdentity.id, rbacAdminRoleId)
   properties: {
     principalId: deploymentIdentity.properties.principalId
