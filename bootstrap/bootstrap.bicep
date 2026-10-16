@@ -7,7 +7,7 @@ param resourceGroupName string = 'rg-azure-web-platform'
 param identityName string = 'id-github-azure-web-provisioner'
 
 var rbacAdminRoleId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'f58310d9-a9f6-439a-9e8d-f62e7b41a168')
-var provisionerIdentityResourceId = resourceId(resourceGroupName, 'Microsoft.ManagedIdentity/userAssignedIdentities', identityName)
+var provisionerIdentityResourceId = resourceId(subscription().subscriptionId, resourceGroupName, 'Microsoft.ManagedIdentity/userAssignedIdentities', identityName)
 var provisioningRoleCondition = '''
 ((!(ActionMatches{'Microsoft.Authorization/roleAssignments/write'})) OR (@Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {b24988ac-6180-42a0-ab88-20f7382dd24c, f58310d9-a9f6-439a-9e8d-f62e7b41a168})) AND ((!(ActionMatches{'Microsoft.Authorization/roleAssignments/delete'})) OR (@Resource[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {b24988ac-6180-42a0-ab88-20f7382dd24c, f58310d9-a9f6-439a-9e8d-f62e7b41a168}))
 '''
