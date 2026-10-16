@@ -140,8 +140,6 @@ resource appSettings 'Microsoft.Web/sites/config@2024-04-01' = {
     AzureWebJobsStorage__clientId: runtimeIdentity.properties.clientId
     APPLICATIONINSIGHTS_CONNECTION_STRING: applicationInsightsConnectionString
     APPLICATIONINSIGHTS_AUTHENTICATION_STRING: 'ClientId=${runtimeIdentity.properties.clientId};Authorization=AAD'
-    FUNCTIONS_EXTENSION_VERSION: '~4'
-    FUNCTIONS_WORKER_RUNTIME: 'dotnet-isolated'
     DEPLOYMENT_STORAGE_CONTAINER: deploymentContainerName
   }
 }

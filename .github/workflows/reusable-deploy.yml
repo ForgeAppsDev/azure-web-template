@@ -15,6 +15,10 @@ on:
       location:
         required: true
         type: string
+      static_web_app_location:
+        required: false
+        default: 'westeurope'
+        type: string
       resource_group:
         required: true
         type: string
@@ -90,7 +94,7 @@ jobs:
               environmentName="${{ inputs.environment_name }}" \
               profile="${{ inputs.profile }}" \
               location="${{ inputs.location }}" \
-              staticWebAppLocation="${{ inputs.location }}" \
+              staticWebAppLocation="${{ inputs.static_web_app_location }}" \
             --query properties.outputs \
             --output json)
           echo "static_web_app=$(jq -r '.staticWebAppName.value' <<< "$outputs")" >> "$GITHUB_OUTPUT"
