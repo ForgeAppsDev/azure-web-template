@@ -62,7 +62,8 @@ jobs:
           set -euo pipefail
           [[ "${{ inputs.repository }}" =~ ^[A-Za-z0-9_.-]+$ ]]
           [[ "${{ inputs.projectName }}" =~ ^[a-z0-9][a-z0-9-]{1,39}$ ]]
-          [[ "${{ inputs.location }}" =~ ^[a-z0-9]+$ ]]\n          [[ "${{ inputs.branch }}" =~ ^[A-Za-z0-9_./-]+$ ]]
+          [[ "${{ inputs.location }}" =~ ^[a-z0-9]+$ ]]
+          [[ "${{ inputs.branch }}" =~ ^[A-Za-z0-9_./-]+$ ]]
 
       - name: Azure login with central provisioner OIDC
         uses: azure/login@v2
