@@ -15,6 +15,11 @@ on:
         description: 'Lowercase Azure project slug, for example wisniowy-piec'
         required: true
         type: string
+      branch:
+        description: 'Existing client deployment branch'
+        required: true
+        default: main
+        type: string
       profile:
         description: 'Infrastructure profile'
         required: true
@@ -57,7 +62,7 @@ jobs:
           set -euo pipefail
           [[ "${{ inputs.repository }}" =~ ^[A-Za-z0-9_.-]+$ ]]
           [[ "${{ inputs.projectName }}" =~ ^[a-z0-9][a-z0-9-]{1,39}$ ]]
-          [[ "${{ inputs.location }}" =~ ^[a-z0-9]+$ ]]
+          [[ "${{ inputs.location }}" =~ ^[a-z0-9]+$ ]]\n          [[ "${{ inputs.branch }}" =~ ^[A-Za-z0-9_./-]+$ ]]
 
       - name: Azure login with central provisioner OIDC
         uses: azure/login@v2
@@ -73,12 +78,13 @@ jobs:
           GH_OWNER_ID: ${{ github.repository_owner_id }}
           CLIENT_REPOSITORY: ${{ inputs.repository }}
           CLIENT_REPOSITORY_ID: ${{ inputs.repositoryId }}
+          CLIENT_BRANCH: ${{ inputs.branch }}
         shell: bash
         run: |
           set -euo pipefail
           [[ "$CLIENT_REPOSITORY_ID" =~ ^[0-9]+$ ]]
           repository_id="$CLIENT_REPOSITORY_ID"
-          subject="repo:${GH_OWNER}@${GH_OWNER_ID}/${CLIENT_REPOSITORY}@${repository_id}:ref:refs/heads/main"
+          subject="repo:${GH_OWNER}@${GH_OWNER_ID}/${CLIENT_REPOSITORY}@${repository_id}:ref:refs/heads/${CLIENT_BRANCH}"
           outputs=$(az deployment sub create \
             --name "provision-${{ inputs.projectName }}-${{ inputs.environment }}" \
             --location "${{ inputs.location }}" \
