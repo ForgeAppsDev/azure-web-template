@@ -7,6 +7,10 @@ on:
         description: 'Client repository name, for example client-wisniowy-piec'
         required: true
         type: string
+      repositoryId:
+        description: 'Numeric GitHub repository ID (supports private client repositories without cross-repo tokens)'
+        required: true
+        type: string
       projectName:
         description: 'Lowercase Azure project slug, for example wisniowy-piec'
         required: true
@@ -65,14 +69,15 @@ jobs:
       - name: Create isolated client deployment boundary
         id: provision
         env:
-          GH_TOKEN: ${{ github.token }}
           GH_OWNER: ${{ github.repository_owner }}
           GH_OWNER_ID: ${{ github.repository_owner_id }}
           CLIENT_REPOSITORY: ${{ inputs.repository }}
+          CLIENT_REPOSITORY_ID: ${{ inputs.repositoryId }}
         shell: bash
         run: |
           set -euo pipefail
-          repository_id=$(gh api "repos/$GH_OWNER/$CLIENT_REPOSITORY" --jq .id)
+          [[ "$CLIENT_REPOSITORY_ID" =~ ^[0-9]+$ ]]
+          repository_id="$CLIENT_REPOSITORY_ID"
           subject="repo:${GH_OWNER}@${GH_OWNER_ID}/${CLIENT_REPOSITORY}@${repository_id}:ref:refs/heads/main"
           outputs=$(az deployment sub create \
             --name "provision-${{ inputs.projectName }}-${{ inputs.environment }}" \

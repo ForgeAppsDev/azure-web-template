@@ -33,7 +33,7 @@ param staticWebAppLocation string = 'westeurope'
   'Free'
   'Standard'
 ])
-param staticWebAppSku string = 'Free'
+param staticWebAppSku string = profile == 'static' ? 'Free' : 'Standard'
 
 @description('Common tags applied to all resources.')
 param tags object = {}

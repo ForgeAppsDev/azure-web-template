@@ -54,6 +54,13 @@ jobs:
       - name: Checkout client repository
         uses: actions/checkout@v4
 
+      - name: Checkout central infrastructure
+        uses: actions/checkout@v4
+        with:
+          repository: ForgeAppsDev/azure-web-template
+          ref: main
+          path: .platform
+
       - name: Validate deployment inputs
         shell: bash
         run: |
@@ -77,7 +84,7 @@ jobs:
           outputs=$(az deployment group create \
             --name "site-${{ github.run_id }}-${{ github.run_attempt }}" \
             --resource-group "${{ inputs.resource_group }}" \
-            --template-file infra/main.bicep \
+            --template-file .platform/infra/main.bicep \
             --parameters \
               projectName="${{ inputs.project_name }}" \
               environmentName="${{ inputs.environment_name }}" \
@@ -128,6 +135,8 @@ jobs:
           action: upload
           app_location: ${{ steps.frontend.outputs.deploy_path }}
           output_location: ''
+          api_location: ''
+          skip_api_build: true
           skip_app_build: true
 
       - name: Detect Functions project
@@ -157,6 +166,14 @@ jobs:
           app-name: ${{ steps.infrastructure.outputs.function_app }}
           package: .deploy/functions
           sku: flexconsumption
+
+      - name: Link Functions API to frontend
+        if: inputs.profile != 'static' && steps.functions.outputs.project != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          backend_id=$(az functionapp show --resource-group "${{ inputs.resource_group }}" --name "${{ steps.infrastructure.outputs.function_app }}" --query id -o tsv)
+          az staticwebapp backends link --name "${{ steps.infrastructure.outputs.static_web_app }}" --resource-group "${{ inputs.resource_group }}" --backend-resource-id "$backend_id" --backend-region "${{ inputs.location }}"
 
       - name: Deployment summary
         shell: bash
