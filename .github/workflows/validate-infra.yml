@@ -33,6 +33,7 @@ jobs:
       - name: Build control-plane templates
         run: |
           az bicep build --file bootstrap/bootstrap.bicep
+          az bicep build --file bootstrap/shared-cosmos.bicep
           az bicep build --file provision/provision-site.bicep
       - name: Validate GitHub Actions syntax
         run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12

@@ -79,7 +79,7 @@ var containerName = 'products-${projectName}-${environmentName}'
 var projectKey = '${projectName}-${environmentName}'
 
 resource cosmosContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-05-15' = if (profile != 'static') {
-  parent: cosmosDatabase!
+  parent: cosmosDatabase
   name: containerName
   properties: {
     resource: {
@@ -94,12 +94,12 @@ resource cosmosContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/con
 }
 
 resource cosmosContainerDataRole 'Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments@2024-05-15' = if (profile != 'static') {
-  parent: sharedCosmos!
-  name: guid(sharedCosmos!.id, clientBoundary.outputs.runtimePrincipalId, containerName)
+  parent: sharedCosmos
+  name: guid(sharedCosmos.id, clientBoundary.outputs.runtimePrincipalId, containerName)
   properties: {
     principalId: clientBoundary.outputs.runtimePrincipalId
-    roleDefinitionId: '${sharedCosmos!.id}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002'
-    scope: '${sharedCosmos!.id}/dbs/forgeapps/colls/${containerName}'
+    roleDefinitionId: '${sharedCosmos.id}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002'
+    scope: '${sharedCosmos.id}/dbs/forgeapps/colls/${containerName}'
   }
   dependsOn: [ cosmosContainer ]
 }
@@ -114,7 +114,7 @@ output siteProfile string = profile
 output environmentNameValue string = environmentName
 output deploymentIdentityName string = clientBoundary.outputs.identityName
 output federatedSubject string = clientBoundary.outputs.federatedSubject
-output cosmosEndpoint string = profile != 'static' ? sharedCosmos!.properties.documentEndpoint : ''
+output cosmosEndpoint string = profile != 'static' ? sharedCosmos.properties.documentEndpoint : ''
 output cosmosDatabaseName string = profile != 'static' ? 'forgeapps' : ''
 output cosmosContainerName string = profile != 'static' ? containerName : ''
 output cosmosProjectKey string = profile != 'static' ? projectKey : ''
