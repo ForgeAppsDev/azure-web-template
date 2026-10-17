@@ -97,9 +97,11 @@ jobs:
               staticWebAppLocation="${{ inputs.static_web_app_location }}" \
             --query properties.outputs \
             --output json)
-          echo "static_web_app=$(jq -r '.staticWebAppName.value' <<< "$outputs")" >> "$GITHUB_OUTPUT"
-          echo "function_app=$(jq -r '.functionAppName.value' <<< "$outputs")" >> "$GITHUB_OUTPUT"
-          echo "function_hostname=$(jq -r '.functionAppHostname.value' <<< "$outputs")" >> "$GITHUB_OUTPUT"
+          {
+            echo "static_web_app=$(jq -r '.staticWebAppName.value' <<< "$outputs")"
+            echo "function_app=$(jq -r '.functionAppName.value' <<< "$outputs")"
+            echo "function_hostname=$(jq -r '.functionAppHostname.value' <<< "$outputs")"
+          } >> "$GITHUB_OUTPUT"
           if [[ "${{ inputs.profile }}" != "static" ]]; then
             echo "VITE_API_BASE_URL=https://$(jq -r '.functionAppHostname.value' <<< "$outputs")/api" >> "$GITHUB_ENV"
           fi
