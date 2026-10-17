@@ -118,12 +118,11 @@ resource sharedCosmosProvisioningRole 'Microsoft.Authorization/roleDefinitions@2
   }
 }
 
-resource platformCosmosProvisioner 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(platformResourceGroup.id, provisionerIdentityResourceId, sharedCosmosProvisioningRole.id)
+module platformCosmosProvisioner 'platform-cosmos-role.bicep' = {
+  name: 'platform-cosmos-role-assignment'
   scope: platformResourceGroup
-  properties: {
+  params: {
     principalId: platformIdentity.outputs.principalId
-    principalType: 'ServicePrincipal'
     roleDefinitionId: sharedCosmosProvisioningRole.id
   }
 }
