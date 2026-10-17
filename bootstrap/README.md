@@ -31,3 +31,8 @@ assigning only the client `Contributor` and conditioned `RBAC Administrator`
 roles. It is intentionally never shared with client repos.
 
 For repositories using GitHub immutable-ID OIDC subjects, pass the exact emitted subject as `--parameters githubSubject="repo:OWNER@OWNER_ID/REPO@REPO_ID:ref:refs/heads/main"`. The provisioner resolves IDs for client repositories automatically.
+
+
+The bootstrap also assigns **Azure Web Shared Cosmos Provisioner** to the central identity at `rg-azure-web-platform` only. It can create project containers and container-scoped Cosmos SQL role assignments there; client deployment identities receive neither this role nor access to the platform resource group. The bootstrap does not create the Cosmos account.
+
+After the bootstrap, create the account once with an interactive Azure Owner identity using `bootstrap/shared-cosmos.bicep`. This is intentionally separate because opting into Free Tier and changing account-level billing/network settings are platform-owner actions. The template opts in to Free Tier at initial account creation, disables local key authentication, and creates one 1000 RU/s shared-throughput database.

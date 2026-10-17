@@ -65,6 +65,18 @@ jobs:
           [[ "${{ inputs.location }}" =~ ^[a-z0-9]+$ ]]
           [[ "${{ inputs.branch }}" =~ ^[A-Za-z0-9_./-]+$ ]]
 
+      - name: Validate shared Cosmos input
+        if: inputs.profile != 'static'
+        env:
+          SHARED_COSMOS_ACCOUNT_NAME: ${{ vars.SHARED_COSMOS_ACCOUNT_NAME }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$SHARED_COSMOS_ACCOUNT_NAME" ]]; then
+            echo "::error::Set SHARED_COSMOS_ACCOUNT_NAME in the central repository after creating the Free Tier account."
+            exit 1
+          fi
+
       - name: Azure login with central provisioner OIDC
         uses: azure/login@v2
         with:
@@ -80,23 +92,28 @@ jobs:
           CLIENT_REPOSITORY: ${{ inputs.repository }}
           CLIENT_REPOSITORY_ID: ${{ inputs.repositoryId }}
           CLIENT_BRANCH: ${{ inputs.branch }}
+          SHARED_COSMOS_ACCOUNT_NAME: ${{ vars.SHARED_COSMOS_ACCOUNT_NAME }}
         shell: bash
         run: |
           set -euo pipefail
           [[ "$CLIENT_REPOSITORY_ID" =~ ^[0-9]+$ ]]
           repository_id="$CLIENT_REPOSITORY_ID"
           subject="repo:${GH_OWNER}@${GH_OWNER_ID}/${CLIENT_REPOSITORY}@${repository_id}:ref:refs/heads/${CLIENT_BRANCH}"
+          deployment_args=(--parameters
+            repository="${{ inputs.repository }}"
+            githubSubject="$subject"
+            projectName="${{ inputs.projectName }}"
+            profile="${{ inputs.profile }}"
+            environmentName="${{ inputs.environment }}"
+            location="${{ inputs.location }}")
+          if [[ "${{ inputs.profile }}" != "static" ]]; then
+            deployment_args+=(sharedCosmosAccountName="$SHARED_COSMOS_ACCOUNT_NAME")
+          fi
           outputs=$(az deployment sub create \
             --name "provision-${{ inputs.projectName }}-${{ inputs.environment }}" \
             --location "${{ inputs.location }}" \
             --template-file provision/provision-site.bicep \
-            --parameters \
-              repository="${{ inputs.repository }}" \
-              githubSubject="$subject" \
-              projectName="${{ inputs.projectName }}" \
-              profile="${{ inputs.profile }}" \
-              environmentName="${{ inputs.environment }}" \
-              location="${{ inputs.location }}" \
+            "${deployment_args[@]}" \
             --query properties.outputs \
             --output json)
 
@@ -108,7 +125,11 @@ jobs:
             "AZURE_LOCATION:azureLocation" \
             "PROJECT_NAME:projectNameValue" \
             "SITE_PROFILE:siteProfile" \
-            "ENVIRONMENT_NAME:environmentNameValue"; do
+            "ENVIRONMENT_NAME:environmentNameValue" \
+            "COSMOS_ENDPOINT:cosmosEndpoint" \
+            "COSMOS_DATABASE:cosmosDatabaseName" \
+            "COSMOS_CONTAINER:cosmosContainerName" \
+            "PROJECT_KEY:cosmosProjectKey"; do
             variable_name=${pair%%:*}
             output_name=${pair##*:}
             value=$(jq -r --arg key "$output_name" '.[$key].value' <<< "$outputs")
@@ -135,6 +156,12 @@ jobs:
             printf 'gh variable set PROJECT_NAME --repo %q --body %q\n' "$TARGET_REPOSITORY" "${{ steps.provision.outputs.PROJECT_NAME }}"
             printf 'gh variable set SITE_PROFILE --repo %q --body %q\n' "$TARGET_REPOSITORY" "${{ steps.provision.outputs.SITE_PROFILE }}"
             printf 'gh variable set ENVIRONMENT_NAME --repo %q --body %q\n' "$TARGET_REPOSITORY" "${{ steps.provision.outputs.ENVIRONMENT_NAME }}"
+            if [[ -n "${{ steps.provision.outputs.COSMOS_ENDPOINT }}" ]]; then
+              printf 'gh variable set COSMOS_ENDPOINT --repo %q --body %q\n' "$TARGET_REPOSITORY" "${{ steps.provision.outputs.COSMOS_ENDPOINT }}"
+              printf 'gh variable set COSMOS_DATABASE --repo %q --body %q\n' "$TARGET_REPOSITORY" "${{ steps.provision.outputs.COSMOS_DATABASE }}"
+              printf 'gh variable set COSMOS_CONTAINER --repo %q --body %q\n' "$TARGET_REPOSITORY" "${{ steps.provision.outputs.COSMOS_CONTAINER }}"
+              printf 'gh variable set PROJECT_KEY --repo %q --body %q\n' "$TARGET_REPOSITORY" "${{ steps.provision.outputs.PROJECT_KEY }}"
+            fi
             echo '```'
             echo "After setting the variables, run the client repo's **Deploy site** workflow or push to \`main\`."
           } >> "$GITHUB_STEP_SUMMARY"

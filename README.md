@@ -243,3 +243,47 @@ Pull requests and pushes affecting infrastructure run:
 - Bicep parameter builds for all three profiles;
 - Bicep builds for bootstrap and provisioning templates;
 - `actionlint` for every GitHub Actions workflow.
+
+
+## Shared Cosmos DB for serverless projects
+
+For small serverless projects that need durable NoSQL data, first check whether the
+platform-owned Cosmos DB for NoSQL account can host a separate project/environment
+container. Avoid creating a database account per template project during early
+development when tenant-level cost consolidation is the requirement.
+
+The account is created once in `rg-azure-web-platform` from
+`bootstrap/shared-cosmos.bicep`. The template opts into Free Tier on account
+creation, disables local key authentication, uses one region, and creates the
+`forgeapps` database with a single manually provisioned shared throughput cap of
+1000 RU/s. Free Tier covers up to 25 GB and 1000 RU/s on one account per subscription.
+Containers in the shared-throughput database share that RU pool; a container is an
+isolation boundary for names/data, while Cosmos SQL RBAC is scoped separately to
+that exact container.
+
+For each non-static project/environment, the central provisioning workflow creates a
+container named `products-{project}-{environment}`, partitioned by `/project`, and
+grants the app runtime managed identity Cosmos DB Built-in Data Contributor only on
+that container. The client GitHub deployment identity receives no Cosmos data-plane
+role and has no access to the platform resource group. The application uses managed
+identity and never reads account keys. Monitoring is enabled for serverless projects
+with a 0.1 GB/day Log Analytics ingestion cap to bound unexpected telemetry charges.
+Keep containers, storage, and throughput within the account's free limits. At the
+25-container limit or when one workload needs independent throughput, region, or
+availability controls, move that workload to its own account/database after reviewing cost.
+
+To create the shared account once, use an Azure Owner identity:
+
+```sh
+az deployment group create \
+  --name shared-cosmos-bootstrap \
+  --resource-group rg-azure-web-platform \
+  --template-file bootstrap/shared-cosmos.bicep \
+  --parameters location=westeurope
+```
+
+Copy the output account name to the central repository Actions variable
+`SHARED_COSMOS_ACCOUNT_NAME`. Then provision the app with the `serverless` profile;
+the central workflow prints the endpoint, database, container, and partition value for
+the client's Actions variables. Never enable Cosmos Serverless, per-container
+throughput, autoscale, or additional regions on this shared free-tier account.

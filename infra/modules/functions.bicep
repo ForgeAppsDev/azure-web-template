@@ -5,13 +5,18 @@ param storageAccountId string
 param deploymentContainerName string
 param deploymentContainerUrl string
 param applicationInsightsConnectionString string
-@description('Explicit HTTPS origins allowed to call this API from browsers.')
-param allowedOrigins array = []
+param cosmosEndpoint string
+param cosmosDatabase string
+param cosmosContainer string
+param projectKey string
+param authMetadataUrl string
+param authAudience string
+param corsAllowedOrigin string
 param tags object = {}
 
 @minValue(40)
 @maxValue(1000)
-param maximumInstanceCount int = 100
+param maximumInstanceCount int = 40
 
 @allowed([
   2048
@@ -26,10 +31,8 @@ resource functionStorage 'Microsoft.Storage/storageAccounts@2023-05-01' existing
   name: storageAccountName
 }
 
-resource runtimeIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+resource runtimeIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = {
   name: runtimeIdentityName
-  location: location
-  tags: tags
 }
 
 resource hostingPlan 'Microsoft.Web/serverfarms@2024-04-01' = {
@@ -103,6 +106,12 @@ resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
     siteConfig: {
       minTlsVersion: '1.2'
       ftpsState: 'Disabled'
+      cors: {
+        allowedOrigins: [
+          corsAllowedOrigin
+        ]
+        supportCredentials: false
+      }
     }
     functionAppConfig: {
       deployment: {
@@ -140,20 +149,18 @@ resource appSettings 'Microsoft.Web/sites/config@2024-04-01' = {
     AzureWebJobsStorage__accountName: storageAccountName
     AzureWebJobsStorage__credential: 'managedidentity'
     AzureWebJobsStorage__clientId: runtimeIdentity.properties.clientId
+    AZURE_CLIENT_ID: runtimeIdentity.properties.clientId
     APPLICATIONINSIGHTS_CONNECTION_STRING: applicationInsightsConnectionString
     APPLICATIONINSIGHTS_AUTHENTICATION_STRING: 'ClientId=${runtimeIdentity.properties.clientId};Authorization=AAD'
+    FUNCTIONS_EXTENSION_VERSION: '~4'
+    FUNCTIONS_WORKER_RUNTIME: 'dotnet-isolated'
     DEPLOYMENT_STORAGE_CONTAINER: deploymentContainerName
-  }
-}
-
-resource webConfig 'Microsoft.Web/sites/config@2024-04-01' = {
-  parent: functionApp
-  name: 'web'
-  properties: {
-    cors: {
-      allowedOrigins: allowedOrigins
-      supportCredentials: false
-    }
+    COSMOS_ENDPOINT: cosmosEndpoint
+    COSMOS_DATABASE: cosmosDatabase
+    COSMOS_CONTAINER: cosmosContainer
+    PROJECT_KEY: projectKey
+    AUTH_METADATA_URL: authMetadataUrl
+    AUTH_AUDIENCE: authAudience
   }
 }
 
