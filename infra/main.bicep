@@ -53,15 +53,6 @@ param authAudience string = ''
 @description('Project and environment key used as the container partition key.')
 param projectKey string = ''
 
-@description('Entra External ID authority URL used by the public SPA.')
-param authAuthority string = ''
-
-@description('SPA application (client) ID. This is public configuration, not a secret.')
-param authClientId string = ''
-
-@description('API scope requested by the SPA, for example api://<api-app-id>/access_as_user.')
-param authApiScope string = ''
-
 @description('Common tags applied to all resources.')
 param tags object = {}
 
