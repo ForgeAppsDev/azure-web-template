@@ -43,6 +43,33 @@ on:
         required: false
         default: 'api'
         type: string
+      cosmos_endpoint:
+        required: false
+        type: string
+      cosmos_database:
+        required: false
+        type: string
+      cosmos_container:
+        required: false
+        type: string
+      project_key:
+        required: false
+        type: string
+      auth_metadata_url:
+        required: false
+        type: string
+      auth_audience:
+        required: false
+        type: string
+      auth_authority:
+        required: false
+        type: string
+      auth_client_id:
+        required: false
+        type: string
+      auth_api_scope:
+        required: false
+        type: string
 
 permissions:
   id-token: write
@@ -73,6 +100,28 @@ jobs:
           [[ "${{ inputs.environment_name }}" =~ ^(dev|test|staging|prod)$ ]]
           [[ "${{ inputs.project_name }}" =~ ^[a-z0-9][a-z0-9-]{1,39}$ ]]
 
+      - name: Validate serverless configuration
+        if: inputs.profile != 'static'
+        env:
+          COSMOS_ENDPOINT: ${{ inputs.cosmos_endpoint }}
+          COSMOS_DATABASE: ${{ inputs.cosmos_database }}
+          COSMOS_CONTAINER: ${{ inputs.cosmos_container }}
+          PROJECT_KEY: ${{ inputs.project_key }}
+          AUTH_METADATA_URL: ${{ inputs.auth_metadata_url }}
+          AUTH_AUDIENCE: ${{ inputs.auth_audience }}
+          AUTH_AUTHORITY: ${{ inputs.auth_authority }}
+          AUTH_CLIENT_ID: ${{ inputs.auth_client_id }}
+          AUTH_API_SCOPE: ${{ inputs.auth_api_scope }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in COSMOS_ENDPOINT COSMOS_DATABASE COSMOS_CONTAINER PROJECT_KEY AUTH_METADATA_URL AUTH_AUDIENCE AUTH_AUTHORITY AUTH_CLIENT_ID AUTH_API_SCOPE; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::$name is required for a serverless deployment."
+              exit 1
+            fi
+          done
+
       - name: Azure login with GitHub OIDC
         uses: azure/login@v2
         with:
@@ -95,6 +144,12 @@ jobs:
               profile="${{ inputs.profile }}" \
               location="${{ inputs.location }}" \
               staticWebAppLocation="${{ inputs.static_web_app_location }}" \
+              cosmosEndpoint="${{ inputs.cosmos_endpoint }}" \
+              cosmosDatabase="${{ inputs.cosmos_database }}" \
+              cosmosContainer="${{ inputs.cosmos_container }}" \
+              projectKey="${{ inputs.project_key }}" \
+              authMetadataUrl="${{ inputs.auth_metadata_url }}" \
+              authAudience="${{ inputs.auth_audience }}" \
             --query properties.outputs \
             --output json)
           {
@@ -121,6 +176,30 @@ jobs:
             deploy_path="${{ inputs.frontend_path }}"
           fi
           echo "deploy_path=$deploy_path" >> "$GITHUB_OUTPUT"
+
+      - name: Write public MSAL configuration
+        if: steps.frontend.outputs.deploy_path != ''
+        env:
+          DEPLOY_PATH: ${{ steps.frontend.outputs.deploy_path }}
+          AUTHORITY: ${{ inputs.auth_authority }}
+          CLIENT_ID: ${{ inputs.auth_client_id }}
+          API_SCOPE: ${{ inputs.auth_api_scope }}
+          API_BASE_URL: ${{ steps.infrastructure.outputs.function_hostname != '' && format('https://{0}/api', steps.infrastructure.outputs.function_hostname) || '/api' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const config = {
+            authority: process.env.AUTHORITY || '',
+            clientId: process.env.CLIENT_ID || '',
+            apiScope: process.env.API_SCOPE || '',
+            apiBaseUrl: process.env.API_BASE_URL || '/api'
+          };
+          fs.writeFileSync(path.join(process.env.DEPLOY_PATH, 'config.js'),
+            'window.APP_CONFIG = ' + JSON.stringify(config, null, 2) + ';\n', { mode: 0o644 });
+          NODE
 
       - name: Get ephemeral Static Web Apps deployment token
         if: steps.frontend.outputs.deploy_path != ''
@@ -176,6 +255,32 @@ jobs:
           app-name: ${{ steps.infrastructure.outputs.function_app }}
           package: .deploy/functions
           sku: flexconsumption
+
+
+      - name: Smoke test deployed catalog API
+        if: inputs.profile != 'static' && steps.functions.outputs.project != ''
+        env:
+          FUNCTION_HOST: ${{ steps.infrastructure.outputs.function_hostname }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://$FUNCTION_HOST/api"
+          for attempt in $(seq 1 24); do
+            health=$(curl --silent --show-error --fail "$base/health" || true)
+            products_status=$(curl --silent --output /dev/null --write-out '%{http_code}' "$base/products" || true)
+            if [[ "$health" == *'"status":"ok"'* && "$products_status" == "200" ]]; then
+              break
+            fi
+            if [[ "$attempt" == "24" ]]; then
+              echo "::error::Functions health or anonymous product read did not become ready."
+              exit 1
+            fi
+            sleep 5
+          done
+          unauthenticated_status=$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            -X POST "$base/products" -H 'Content-Type: application/json' \
+            --data '{"name":"unauthorized smoke test","description":"","price":1,"category":"test"}')
+          [[ "$unauthenticated_status" == "401" ]]
 
       - name: Deployment summary
         shell: bash

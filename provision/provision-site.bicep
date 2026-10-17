@@ -27,6 +27,9 @@ param environmentName string
 
 param location string = 'westeurope'
 
+@description('Existing platform-owned Free Tier Cosmos DB for NoSQL account. Required for serverless/advanced profiles.')
+param sharedCosmosAccountName string = 'forgeapps-${uniqueString(subscription().id)}'
+
 var resourceGroupName = 'rg-${projectName}-${environmentName}'
 var commonTags = {
   project: projectName
@@ -57,6 +60,21 @@ module clientBoundary 'client-boundary.bicep' = {
   }
 }
 
+resource platformResourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' existing = {
+  name: 'rg-azure-web-platform'
+}
+
+module projectCosmos 'cosmos-project-container.bicep' = if (profile != 'static') {
+  name: 'project-cosmos-container'
+  scope: platformResourceGroup
+  params: {
+    accountName: sharedCosmosAccountName
+    projectName: projectName
+    environmentName: environmentName
+    runtimePrincipalId: clientBoundary.outputs.runtimePrincipalId
+  }
+}
+
 output azureClientId string = clientBoundary.outputs.clientId
 output azureTenantId string = tenant().tenantId
 output azureSubscriptionId string = subscription().subscriptionId
@@ -67,4 +85,8 @@ output siteProfile string = profile
 output environmentNameValue string = environmentName
 output deploymentIdentityName string = clientBoundary.outputs.identityName
 output federatedSubject string = clientBoundary.outputs.federatedSubject
-
+output cosmosEndpoint string = profile != 'static' ? projectCosmos!.outputs.endpoint : ''
+output cosmosDatabaseName string = profile != 'static' ? projectCosmos!.outputs.databaseName : ''
+output cosmosContainerName string = profile != 'static' ? projectCosmos!.outputs.containerName : ''
+output cosmosProjectKey string = profile != 'static' ? projectCosmos!.outputs.projectKey : ''
+output runtimePrincipalId string = profile != 'static' ? clientBoundary.outputs.runtimePrincipalId : ''

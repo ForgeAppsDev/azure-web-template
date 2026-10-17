@@ -24,6 +24,17 @@ resource deploymentIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@20
   })
 }
 
+
+var runtimeIdentityName = '${projectName}-${environmentName}-api-runtime'
+
+resource runtimeIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = if (enableRuntimeRoleAssignments) {
+  name: runtimeIdentityName
+  location: location
+  tags: union(tags, {
+    purpose: 'application-runtime'
+  })
+}
+
 resource mainBranchCredential 'Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials@2023-01-31' = {
   parent: deploymentIdentity
   name: 'github-main'
@@ -62,3 +73,5 @@ output clientId string = deploymentIdentity.properties.clientId
 output principalId string = deploymentIdentity.properties.principalId
 output identityName string = deploymentIdentity.name
 output federatedSubject string = mainBranchCredential.properties.subject
+output runtimePrincipalId string = enableRuntimeRoleAssignments ? runtimeIdentity!.properties.principalId : ''
+output runtimeIdentityName string = enableRuntimeRoleAssignments ? runtimeIdentity!.name : ''

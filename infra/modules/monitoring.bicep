@@ -8,6 +8,10 @@ resource workspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
   tags: tags
   properties: {
     retentionInDays: 30
+    workspaceCapping: {
+      // A low daily ingestion ceiling limits unexpected monitoring charges.
+      dailyQuotaGb: json('0.1')
+    }
     features: {
       enableLogAccessUsingOnlyResourcePermissions: true
     }

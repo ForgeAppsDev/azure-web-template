@@ -88,6 +88,45 @@ resource subscriptionRbacAdmin 'Microsoft.Authorization/roleAssignments@2022-04-
   }
 }
 
+
+// Dedicated control-plane role: it can create project containers and scoped
+// Cosmos SQL role assignments only inside the platform resource group.
+resource sharedCosmosProvisioningRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' = {
+  name: guid(subscription().id, 'azure-web-shared-cosmos-provisioner')
+  properties: {
+    roleName: 'Azure Web Shared Cosmos Provisioner'
+    description: 'Creates shared database containers and container-scoped Cosmos SQL role assignments in the platform resource group.'
+    type: 'CustomRole'
+    assignableScopes: [ subscription().id ]
+    permissions: [
+      {
+        actions: [
+          'Microsoft.DocumentDB/databaseAccounts/read'
+          'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/read'
+          'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/read'
+          'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/write'
+          'Microsoft.DocumentDB/databaseAccounts/sqlRoleDefinitions/read'
+          'Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments/read'
+          'Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments/write'
+          'Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments/delete'
+        ]
+        notActions: []
+        dataActions: []
+        notDataActions: []
+      }
+    ]
+  }
+}
+
+module platformCosmosProvisioner 'platform-cosmos-role.bicep' = {
+  name: 'platform-cosmos-role-assignment'
+  scope: platformResourceGroup
+  params: {
+    principalId: platformIdentity.outputs.principalId
+    roleDefinitionId: sharedCosmosProvisioningRole.id
+  }
+}
+
 output azureProvisionerClientId string = platformIdentity.outputs.clientId
 output azureTenantId string = tenant().tenantId
 output azureSubscriptionId string = subscription().subscriptionId
