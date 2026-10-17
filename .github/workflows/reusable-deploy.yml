@@ -97,8 +97,14 @@ jobs:
               staticWebAppLocation="${{ inputs.static_web_app_location }}" \
             --query properties.outputs \
             --output json)
-          echo "static_web_app=$(jq -r '.staticWebAppName.value' <<< "$outputs")" >> "$GITHUB_OUTPUT"
-          echo "function_app=$(jq -r '.functionAppName.value' <<< "$outputs")" >> "$GITHUB_OUTPUT"
+          {
+            echo "static_web_app=$(jq -r '.staticWebAppName.value' <<< "$outputs")"
+            echo "function_app=$(jq -r '.functionAppName.value' <<< "$outputs")"
+            echo "function_hostname=$(jq -r '.functionAppHostname.value' <<< "$outputs")"
+          } >> "$GITHUB_OUTPUT"
+          if [[ "${{ inputs.profile }}" != "static" ]]; then
+            echo "VITE_API_BASE_URL=https://$(jq -r '.functionAppHostname.value' <<< "$outputs")/api" >> "$GITHUB_ENV"
+          fi
 
       - name: Prepare frontend
         id: frontend
@@ -171,14 +177,6 @@ jobs:
           package: .deploy/functions
           sku: flexconsumption
 
-      - name: Link Functions API to frontend
-        if: inputs.profile != 'static' && steps.functions.outputs.project != ''
-        shell: bash
-        run: |
-          set -euo pipefail
-          backend_id=$(az functionapp show --resource-group "${{ inputs.resource_group }}" --name "${{ steps.infrastructure.outputs.function_app }}" --query id -o tsv)
-          az staticwebapp backends link --name "${{ steps.infrastructure.outputs.static_web_app }}" --resource-group "${{ inputs.resource_group }}" --backend-resource-id "$backend_id" --backend-region "${{ inputs.location }}"
-
       - name: Deployment summary
         shell: bash
         run: |
@@ -188,5 +186,6 @@ jobs:
             echo "- Profile: \`${{ inputs.profile }}\`"
             echo "- Static Web App: \`${{ steps.infrastructure.outputs.static_web_app }}\`"
             echo "- Function App: \`${{ steps.infrastructure.outputs.function_app || 'not deployed' }}\`"
+            echo "- API mode: separate HTTPS endpoint with exact-origin CORS (no paid SWA backend link)"
           } >> "$GITHUB_STEP_SUMMARY"
 

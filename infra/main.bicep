@@ -28,12 +28,12 @@ param location string = resourceGroup().location
 @description('Azure Static Web Apps location.')
 param staticWebAppLocation string = 'westeurope'
 
-@description('Static Web Apps SKU.')
+@description('Static Web Apps SKU. Keep Free by default; the external Flex Functions API does not require Standard.')
 @allowed([
   'Free'
   'Standard'
 ])
-param staticWebAppSku string = profile == 'static' ? 'Free' : 'Standard'
+param staticWebAppSku string = 'Free'
 
 @description('Common tags applied to all resources.')
 param tags object = {}
@@ -93,6 +93,7 @@ module functions 'modules/functions.bicep' = if (deployBackend) {
     deploymentContainerName: functionStorage!.outputs.deploymentContainerName
     deploymentContainerUrl: functionStorage!.outputs.deploymentContainerUrl
     applicationInsightsConnectionString: monitoring!.outputs.applicationInsightsConnectionString
+    allowedOrigins: ['https://${staticWebApp.outputs.defaultHostname}']
     tags: commonTags
   }
 }
