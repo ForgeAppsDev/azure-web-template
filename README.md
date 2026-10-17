@@ -38,8 +38,26 @@ All profiles use the single `infra/main.bicep` orchestrator and conditional modu
 | Profile | Resources |
 | --- | --- |
 | `static` | Azure Static Web App only |
-| `serverless` | Static Web App, .NET 8 isolated Azure Functions on Flex Consumption, runtime identity, Functions Storage, Log Analytics and Application Insights |
+| `serverless` | Free Static Web App, separate .NET 8 isolated Azure Functions on Flex Consumption, runtime identity, Functions Storage, Log Analytics and Application Insights |
 | `advanced` | Everything in `serverless`, plus a separate application-data Storage Account |
+
+`serverless` keeps the browser frontend and API on separate HTTPS origins. The
+deployment workflow does **not** link Functions into Static Web Apps, because that
+integration requires the paid Standard tier. Configure API CORS for the exact SWA
+origin; CORS is not authentication, so every non-public API operation must validate
+the caller's access token and authorization role.
+
+For document data, consider the platform-owned shared Cosmos DB Free account only
+when a project benefits from document queries. It is an opt-in data mode and is not
+created in a client resource group. Create one container per project/environment in
+the platform's shared-throughput database, use the project's own partition key, and
+grant that app's runtime identity a data-plane role scoped only to its container.
+Never give a client deployment identity the Cosmos account key or broad account
+access. The one-account free allowance is 1,000 RU/s and 25 GB total, shared by all
+projects; a shared database supports at most 25 containers. Cosmos Free is provisioned
+throughput, not Cosmos Serverless, and the allowance is not a hard spending cap.
+Choose isolated Table Storage for simple key lookups or whenever shared throughput,
+administration, or recovery boundaries are unacceptable.
 
 Functions uses the current `FC1` Flex Consumption plan, managed identity access to
 Storage, and a dedicated blob container for deployment packages. Linux Consumption

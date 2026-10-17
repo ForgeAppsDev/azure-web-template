@@ -5,6 +5,8 @@ param storageAccountId string
 param deploymentContainerName string
 param deploymentContainerUrl string
 param applicationInsightsConnectionString string
+@description('Explicit HTTPS origins allowed to call this API from browsers.')
+param allowedOrigins array = []
 param tags object = {}
 
 @minValue(40)
@@ -141,6 +143,17 @@ resource appSettings 'Microsoft.Web/sites/config@2024-04-01' = {
     APPLICATIONINSIGHTS_CONNECTION_STRING: applicationInsightsConnectionString
     APPLICATIONINSIGHTS_AUTHENTICATION_STRING: 'ClientId=${runtimeIdentity.properties.clientId};Authorization=AAD'
     DEPLOYMENT_STORAGE_CONTAINER: deploymentContainerName
+  }
+}
+
+resource webConfig 'Microsoft.Web/sites/config@2024-04-01' = {
+  parent: functionApp
+  name: 'web'
+  properties: {
+    cors: {
+      allowedOrigins: allowedOrigins
+      supportCredentials: false
+    }
   }
 }
 
