@@ -54,7 +54,7 @@ jobs:
           github_subject='repo:ForgeAppsDev@343706216/Compass@1468038232:ref:refs/heads/main'
           output="$(az deployment sub create \
             --name provision-compass-prod \
-            --location westeurope \
+            --location uksouth \
             --template-file provision/provision-site.bicep \
             --parameters \
               repository=Compass \
@@ -62,7 +62,7 @@ jobs:
               projectName=compass \
               profile=static \
               environmentName=prod \
-              location=westeurope \
+              location=uksouth \
             --query properties.outputs \
             --output json)"
           echo "$output" > "$RUNNER_TEMP/compass-azure-outputs.json"
@@ -91,7 +91,7 @@ jobs:
             echo
             echo "- Resource group: \`rg-compass-prod\`"
             echo "- GitHub OIDC: \`ForgeAppsDev/Compass:main\` (immutable IDs)"
-            echo "- Profile: \`static\`, region: \`westeurope\`"
+            echo "- Profile: \`static\`, region: \`uksouth\`"
             echo "- No client secret, publish profile or shared cross-client credentials were issued."
             echo
             echo "### Configure the eight Compass Actions variables"
