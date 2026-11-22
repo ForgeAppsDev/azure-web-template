@@ -1,0 +1,118 @@
+name: Provision Compass isolated Azure boundary
+
+# This is a narrowly scoped, one-time bootstrap for an already-approved
+# client. Pushing this new workflow to main is the initial trigger.
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/provision-compass-once.yml'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  provision-compass:
+    if: github.repository == 'ForgeAppsDev/azure-web-template' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: bootstrap-compass-prod
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check central OIDC configuration
+        env:
+          CLIENT_ID: ${{ vars.AZURE_PROVISIONER_CLIENT_ID }}
+          TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in CLIENT_ID TENANT_ID SUBSCRIPTION_ID; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::Central platform variable $name is missing. Run the documented platform bootstrap."
+              exit 1
+            fi
+          done
+
+      - name: Azure login using central provisioner OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_PROVISIONER_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Provision Compass resource group and repository-scoped deployment identity
+        id: azure
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Immutable GitHub organisation/repository IDs protect against rename-based trust confusion.
+          github_subject='repo:ForgeAppsDev@343706216/Compass@1468038232:ref:refs/heads/main'
+          output="$(az deployment sub create \
+            --name provision-compass-prod \
+            --location westeurope \
+            --template-file provision/provision-site.bicep \
+            --parameters \
+              repository=Compass \
+              githubSubject="$github_subject" \
+              projectName=compass \
+              profile=static \
+              environmentName=prod \
+              location=westeurope \
+            --query properties.outputs \
+            --output json)"
+          echo "$output" > "$RUNNER_TEMP/compass-azure-outputs.json"
+
+          group="$(jq -r '.azureResourceGroup.value' <<<"$output")"
+          identity="$(jq -r '.deploymentIdentityName.value' <<<"$output")"
+          test "$group" = "rg-compass-prod"
+          test -n "$identity"
+          az group show --name "$group" --query '{name:name,location:location,provisioningState:properties.provisioningState}' -o json
+          az identity show --resource-group "$group" --name "$identity" --query '{name:name,clientId:clientId}' -o json
+          actual="$(az identity federated-credential list --resource-group "$group" --identity-name "$identity" --query '[0].subject' -o tsv)"
+          test "$actual" = "$github_subject"
+          echo "group=$group" >> "$GITHUB_OUTPUT"
+          echo "identity=$identity" >> "$GITHUB_OUTPUT"
+
+      - name: Write client configuration handoff
+        env:
+          TARGET_REPO: ForgeAppsDev/Compass
+        shell: bash
+        run: |
+          set -euo pipefail
+          file="$RUNNER_TEMP/compass-azure-outputs.json"
+          test -s "$file"
+          {
+            echo "## Compass Azure provisioning verified"
+            echo
+            echo "- Resource group: \`rg-compass-prod\`"
+            echo "- GitHub OIDC: \`ForgeAppsDev/Compass:main\` (immutable IDs)"
+            echo "- Profile: \`static\`, region: \`westeurope\`"
+            echo "- No client secret, publish profile or shared cross-client credentials were issued."
+            echo
+            echo "### Configure the eight Compass Actions variables"
+            echo "The central GitHub token cannot write to a different private repository."
+            echo "Run these commands as the repository owner:"
+            printf '\x60\x60\x60bash\n'
+            while IFS=':' read -r variable key; do
+              value="$(jq -r --arg key "$key" '.[$key].value' "$file")"
+              test -n "$value"
+              printf 'gh variable set %s --repo %s --body %q\n' "$variable" "$TARGET_REPO" "$value"
+            done <<'VARS'
+          AZURE_CLIENT_ID:azureClientId
+          AZURE_TENANT_ID:azureTenantId
+          AZURE_SUBSCRIPTION_ID:azureSubscriptionId
+          AZURE_RESOURCE_GROUP:azureResourceGroup
+          AZURE_LOCATION:azureLocation
+          PROJECT_NAME:projectNameValue
+          SITE_PROFILE:siteProfile
+          ENVIRONMENT_NAME:environmentNameValue
+          VARS
+            printf '\x60\x60\x60\n'
+            echo
+            echo "Then run \`Deploy Compass prototypes\` in the client repository."
+          } >> "$GITHUB_STEP_SUMMARY"
