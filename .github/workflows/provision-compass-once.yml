@@ -97,7 +97,7 @@ jobs:
             echo "### Configure the eight Compass Actions variables"
             echo "The central GitHub token cannot write to a different private repository."
             echo "Run these commands as the repository owner:"
-            echo '\`\`\`bash'
+            printf '\x60\x60\x60bash\n'
             while IFS=':' read -r variable key; do
               value="$(jq -r --arg key "$key" '.[$key].value' "$file")"
               test -n "$value"
@@ -112,7 +112,7 @@ jobs:
           SITE_PROFILE:siteProfile
           ENVIRONMENT_NAME:environmentNameValue
           VARS
-            echo '\`\`\`'
+            printf '\x60\x60\x60\n'
             echo
             echo "Then run \`Deploy Compass prototypes\` in the client repository."
           } >> "$GITHUB_STEP_SUMMARY"
